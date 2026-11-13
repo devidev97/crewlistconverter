@@ -15,6 +15,8 @@ Vite escuchará en `0.0.0.0:5173`, por lo que también funcionará detrás del p
 
 Si Vite ya estaba en ejecución antes de cambiar la configuración, detenlo con `Ctrl+C` y vuelve a iniciarlo con `npm run dev`.
 
+El acceso es el mismo que en ADR: autenticación básica con `BASIC_AUTH_USER` y `BASIC_AUTH_PASSWORD`. Copia `.env.example` a `.env` y pon los mismos valores. Sin esas variables la aplicación responde que no está disponible. En Vercel hay que definir las dos variables de entorno.
+
 Después:
 
 1. Carga el Excel recibido.
