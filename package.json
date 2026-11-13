@@ -1,0 +1,14 @@
+{
+  "name": "adr-crewlist",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Conversor local de listas de tripulación al formato Crew CSV",
+  "scripts": {
+    "dev": "vite --host 0.0.0.0",
+    "build": "vite build",
+    "preview": "vite preview --host 0.0.0.0"
+  },
+  "devDependencies": {
+    "vite": "^8.3.8"
+  }
+}

@@ -1,0 +1,203 @@
+<!doctype html>
+<html lang="es">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="theme-color" content="#1a63f5" />
+    <meta name="description" content="Conversor local de listas de tripulación Excel al formato Crew CSV de la Autoridad Portuaria." />
+    <title>ADR Crewlist · Conversor de tripulación</title>
+    <link rel="stylesheet" href="styles.css" />
+  </head>
+  <body>
+    <div class="page-shell">
+      <header class="topbar">
+        <a class="brand" href="#" aria-label="DFDS Crewlist">
+          <img class="brand-logo" src="/brand/dfds-logo.svg" alt="DFDS" width="81" height="28" />
+          <span class="brand-title">Crewlist</span>
+        </a>
+
+        <div class="topbar-status">
+          <span class="privacy-pill">
+            <svg aria-hidden="true" viewBox="0 0 24 24"><path d="M12 2 4.5 5v6.2c0 4.8 3.2 9.2 7.5 10.8 4.3-1.6 7.5-6 7.5-10.8V5L12 2Zm3.4 8.1-4.1 4.2-2.5-2.5 1.1-1.1 1.4 1.4 3-3 1.1 1Z" /></svg>
+            Procesamiento local
+          </span>
+          <button class="icon-button" id="help-button" type="button">Ayuda</button>
+        </div>
+      </header>
+
+      <main>
+        <section class="hero" id="hero">
+          <div class="hero-copy">
+            <h1>Conversor Crew List</h1>
+            <p>Importa la lista que recibes, completa los datos de cada movimiento y genera archivos listos para la Autoridad Portuaria.</p>
+          </div>
+
+          <div class="upload-card" id="upload-card">
+            <div class="upload-card-heading">
+              <span class="step-number">01</span>
+              <div>
+                <h2>Cargar lista de tripulación</h2>
+                <p>El sistema detectará las columnas automáticamente.</p>
+              </div>
+            </div>
+
+            <input id="file-input" type="file" accept=".xls,.xlsx,.csv" hidden />
+            <button class="dropzone" id="dropzone" type="button">
+              <span class="upload-icon">
+                <svg width="40" height="48" viewBox="0 0 40 48" fill="none" aria-hidden="true"><path d="M8 4h16l8 8v32a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2z" stroke="currentColor" stroke-width="1.5"/><path d="M24 4v8h8" stroke="currentColor" stroke-width="1.5"/><path d="M12 22h16M12 28h16M12 34h10" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>
+              </span>
+              <strong>Arrastra aquí tu archivo</strong>
+              <span>o <u>selecciónalo desde el equipo</u></span>
+              <small>Formatos admitidos: .XLS, .XLSX y .CSV · Máx. 10 MB</small>
+            </button>
+
+            <div class="format-strip">
+              <span class="file-type">XLS</span>
+              <p><strong>Compatible con la plantilla recibida</strong><br /><span>Las columnas vacías no afectan a la importación.</span></p>
+              <svg aria-hidden="true" viewBox="0 0 24 24"><path d="m9.2 16.2-4.3-4.3 1.4-1.4 2.9 2.9 8.5-8.5 1.4 1.4-9.9 9.9Z" /></svg>
+            </div>
+          </div>
+        </section>
+
+        <section class="workspace is-hidden" id="workspace" aria-live="polite">
+          <div class="workspace-head">
+            <div>
+              <h2>Revisa y completa la escala</h2>
+            </div>
+            <button class="button button-ghost" id="change-file" type="button">
+              <svg aria-hidden="true" viewBox="0 0 24 24"><path d="M12 5v3l4-4-4-4v3a9 9 0 1 0 8.5 12h-2.2A7 7 0 1 1 12 5Z" /></svg>
+              Cambiar archivo
+            </button>
+          </div>
+
+          <div class="progress-rail" aria-label="Progreso de la conversión">
+            <div class="progress-step is-complete"><span><svg viewBox="0 0 24 24"><path d="m9.2 16.2-4.3-4.3 1.4-1.4 2.9 2.9 8.5-8.5 1.4 1.4-9.9 9.9Z" /></svg></span><div><small>PASO 1</small><strong>Archivo importado</strong></div></div>
+            <div class="rail-line"></div>
+            <div class="progress-step is-active" id="progress-crew"><span>2</span><div><small>PASO 2</small><strong>Validar datos</strong></div></div>
+            <div class="rail-line"></div>
+            <div class="progress-step" id="progress-movements"><span>3</span><div><small>PASO 3</small><strong>Configurar salidas</strong></div></div>
+            <div class="rail-line"></div>
+            <div class="progress-step" id="progress-export"><span>4</span><div><small>PASO 4</small><strong>Exportar CSV</strong></div></div>
+          </div>
+
+          <section class="import-summary">
+            <div class="file-badge">
+              <span class="file-icon"><svg aria-hidden="true" viewBox="0 0 24 24"><path d="M6 2h8l4 4v16H6V2Zm8 1.8V7h3.2L14 3.8ZM8 11v1.7h8V11H8Zm0 4v1.7h8V15H8Z" /></svg></span>
+              <div><strong id="source-name">—</strong><small id="source-meta">—</small></div>
+            </div>
+            <div class="summary-stat"><strong id="crew-count">0</strong><span>Tripulantes</span></div>
+            <div class="summary-stat"><strong id="valid-count">0</strong><span>Registros correctos</span></div>
+            <div class="summary-stat warning"><strong id="warning-count">0</strong><span>Por revisar</span></div>
+          </section>
+
+          <section class="panel crew-panel">
+            <div class="panel-header">
+              <div class="panel-title">
+                <span class="step-number small">02</span>
+                <div><h3>Datos de tripulación</h3><p>Corrige cualquier dato antes de generar los movimientos.</p></div>
+              </div>
+              <div class="table-actions">
+                <label class="search-box">
+                  <svg aria-hidden="true" viewBox="0 0 24 24"><path d="m19.6 21-6.3-6.3a7.5 7.5 0 1 1 1.4-1.4l6.3 6.3-1.4 1.4ZM8.5 14A5.5 5.5 0 1 0 8.5 3a5.5 5.5 0 0 0 0 11Z" /></svg>
+                  <input id="crew-search" type="search" placeholder="Buscar tripulante..." />
+                </label>
+                <button class="button button-soft" id="show-issues" type="button">Mostrar incidencias</button>
+              </div>
+            </div>
+
+            <div class="table-wrap">
+              <table>
+                <thead><tr><th>Tripulante</th><th>Documento</th><th>Nacionalidad</th><th>Nacimiento</th><th>Categoría</th><th>Sexo</th><th>Estado</th><th><span class="sr-only">Acciones</span></th></tr></thead>
+                <tbody id="crew-body"></tbody>
+              </table>
+              <div class="empty-table is-hidden" id="empty-table">No hay tripulantes que coincidan con la búsqueda.</div>
+            </div>
+            <div class="table-footer"><span id="table-result-count">0 registros</span><span>Haz clic en <strong>Editar</strong> para corregir un registro.</span></div>
+          </section>
+
+          <section class="movements-section">
+            <div class="section-heading">
+              <div class="panel-title">
+                <span class="step-number small">03</span>
+                <div><h3>Movimientos de escala</h3><p>Cada movimiento generará un CSV independiente con toda la tripulación.</p></div>
+              </div>
+              <button class="button button-dark" id="add-movement" type="button">
+                <svg aria-hidden="true" viewBox="0 0 24 24"><path d="M11 5h2v6h6v2h-6v6h-2v-6H5v-2h6V5Z" /></svg>
+                Añadir movimiento
+              </button>
+            </div>
+            <div id="movement-list" class="movement-list"></div>
+          </section>
+
+          <section class="export-panel" id="export-panel">
+            <div class="export-icon"><svg aria-hidden="true" viewBox="0 0 24 24"><path d="M13 4h-2v8.2L8.4 9.6 7 11l5 5 5-5-1.4-1.4-2.6 2.6V4ZM5 18v2h14v-2H5Z" /></svg></div>
+            <div class="export-copy"><small>PASO 04 · ARCHIVOS DE AUTORIDAD PORTUARIA</small><h3 id="export-title">Completa los datos de la escala</h3><p id="export-description">Revisaremos nombres, fechas, códigos de puerto y las 29 columnas antes de exportar.</p></div>
+            <button class="button button-primary button-large" id="export-all" type="button" disabled>
+              <svg aria-hidden="true" viewBox="0 0 24 24"><path d="M13 4h-2v8.2L8.4 9.6 7 11l5 5 5-5-1.4-1.4-2.6 2.6V4ZM5 18v2h14v-2H5Z" /></svg>
+              <span>Descargar CSV</span>
+            </button>
+          </section>
+        </section>
+      </main>
+
+      <footer>
+        <span>ADR · Operaciones portuarias</span>
+        <span>Conversión local y privada · Formato de 29 columnas</span>
+      </footer>
+    </div>
+
+    <dialog id="crew-dialog" class="modal">
+      <form method="dialog" id="crew-form">
+        <div class="modal-header">
+          <div><small>EDITAR REGISTRO</small><h3 id="modal-title">Datos del tripulante</h3></div>
+          <button class="icon-button" value="cancel" formnovalidate aria-label="Cerrar" type="submit"><svg aria-hidden="true" viewBox="0 0 24 24"><path d="m6.4 5 5.6 5.6L17.6 5 19 6.4 13.4 12l5.6 5.6-1.4 1.4-5.6-5.6L6.4 19 5 17.6l5.6-5.6L5 6.4 6.4 5Z" /></svg></button>
+        </div>
+        <div class="modal-body">
+          <input type="hidden" name="recordIndex" />
+          <div class="form-grid modal-grid">
+            <label class="field span-2"><span>Nombre <b>*</b></span><input name="Nombre" required /></label>
+            <label class="field span-2"><span>Apellidos <b>*</b></span><input name="Apellidos" required /></label>
+            <label class="field"><span>Tipo documento <b>*</b></span><input name="TipoDocumento" required maxlength="5" /></label>
+            <label class="field span-2"><span>Número de documento <b>*</b></span><input name="NumeroDocumento" required /></label>
+            <label class="field"><span>Número de visado</span><input name="NumeroVisado" /></label>
+            <label class="field"><span>Caducidad <b>*</b></span><input name="FechaCaducidadDocumento" placeholder="DD/MM/AAAA" required /></label>
+            <label class="field"><span>Nacionalidad <b>*</b></span><input name="Nacionalidad" maxlength="2" required /></label>
+            <label class="field"><span>Fecha de nacimiento <b>*</b></span><input name="FechaNacimiento" placeholder="DD/MM/AAAA" required /></label>
+            <label class="field"><span>Lugar de nacimiento <b>*</b></span><input name="LugarNacimiento" required /></label>
+            <label class="field"><span>Código categoría <b>*</b></span><input name="Categoria" maxlength="5" required /></label>
+            <label class="field span-2"><span>Descripción de categoría</span><input name="CategoriaDes" /></label>
+            <label class="field"><span>Sexo <b>*</b></span><select name="Sexo" required><option value="">Seleccionar</option><option value="M">M · Masculino</option><option value="F">F · Femenino</option></select></label>
+            <label class="field span-4"><span>Observaciones</span><input name="Observaciones" /></label>
+          </div>
+        </div>
+        <div class="modal-footer">
+          <button class="button button-ghost" value="cancel" formnovalidate type="submit">Cancelar</button>
+          <button class="button button-primary" id="save-crew" value="default" type="submit">Guardar cambios</button>
+        </div>
+      </form>
+    </dialog>
+
+    <dialog id="help-dialog" class="modal help-modal">
+      <form method="dialog">
+        <div class="modal-header"><div><small>GUÍA RÁPIDA</small><h3>Cómo preparar los archivos</h3></div><button class="icon-button" value="close" aria-label="Cerrar"><svg aria-hidden="true" viewBox="0 0 24 24"><path d="m6.4 5 5.6 5.6L17.6 5 19 6.4 13.4 12l5.6 5.6-1.4 1.4-5.6-5.6L6.4 19 5 17.6l5.6-5.6L5 6.4 6.4 5Z" /></svg></button></div>
+        <div class="modal-body help-content">
+          <ol><li><strong>Carga el Excel recibido.</strong><span>Se admiten .xls, .xlsx y también un CSV previo.</span></li><li><strong>Revisa las incidencias.</strong><span>La tabla indica si falta algún dato obligatorio.</span></li><li><strong>Añade una o varias salidas.</strong><span>Completa escala, puertos y fechas para cada CSV.</span></li><li><strong>Descarga el resultado.</strong><span>Una salida descarga un CSV; varias se agrupan en un ZIP.</span></li></ol>
+          <p class="help-note">Los CSV se generan con separador de punto y coma, 29 columnas y finales de línea Windows (CRLF), igual que los archivos de referencia.</p>
+        </div>
+        <div class="modal-footer"><button class="button button-primary" value="close">Entendido</button></div>
+      </form>
+    </dialog>
+
+    <datalist id="port-codes">
+      <option value="ESALG">Algeciras</option>
+      <option value="ESCEU">Ceuta</option>
+      <option value="MAPTM">Tánger Med</option>
+      <option value="MATNG">Tánger</option>
+      <option value="ESTAR">Tarifa</option>
+    </datalist>
+    <div id="toast" class="toast" role="status" aria-live="polite"></div>
+
+    <script src="/vendor/xlsx.full.min.js"></script>
+    <script type="module" src="/main.js"></script>
+  </body>
+</html>
