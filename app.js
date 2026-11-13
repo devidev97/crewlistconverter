@@ -17,30 +17,17 @@
     workspace: document.querySelector("#workspace"),
     fileInput: document.querySelector("#file-input"),
     dropzone: document.querySelector("#dropzone"),
-    changeFile: document.querySelector("#change-file"),
-    sourceName: document.querySelector("#source-name"),
-    sourceMeta: document.querySelector("#source-meta"),
-    crewCount: document.querySelector("#crew-count"),
-    validCount: document.querySelector("#valid-count"),
-    warningCount: document.querySelector("#warning-count"),
+    dropLabel: document.querySelector("#dropzone-label"),
     crewBody: document.querySelector("#crew-body"),
     crewSearch: document.querySelector("#crew-search"),
     showIssues: document.querySelector("#show-issues"),
     tableResultCount: document.querySelector("#table-result-count"),
     emptyTable: document.querySelector("#empty-table"),
     movementList: document.querySelector("#movement-list"),
-    addMovement: document.querySelector("#add-movement"),
     exportAll: document.querySelector("#export-all"),
-    exportTitle: document.querySelector("#export-title"),
-    exportDescription: document.querySelector("#export-description"),
-    progressCrew: document.querySelector("#progress-crew"),
-    progressMovements: document.querySelector("#progress-movements"),
-    progressExport: document.querySelector("#progress-export"),
     crewDialog: document.querySelector("#crew-dialog"),
     crewForm: document.querySelector("#crew-form"),
     modalTitle: document.querySelector("#modal-title"),
-    helpButton: document.querySelector("#help-button"),
-    helpDialog: document.querySelector("#help-dialog"),
     toast: document.querySelector("#toast"),
   };
 
@@ -53,12 +40,6 @@
       .replace(/>/g, "&gt;")
       .replace(/"/g, "&quot;")
       .replace(/'/g, "&#039;");
-  }
-
-  function formatBytes(bytes) {
-    if (bytes < 1024) return `${bytes} B`;
-    if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
-    return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
   }
 
   function showToast(message, type) {
@@ -90,14 +71,11 @@
     });
   }
 
-  function ensurePortList() {
-    if (document.querySelector("#port-codes")) return;
-    const datalist = document.createElement("datalist");
-    datalist.id = "port-codes";
-    datalist.innerHTML = uniquePorts()
-      .map((port) => `<option value="${escapeHtml(port.code)}">${escapeHtml(port.label)}</option>`)
-      .join("");
-    document.body.appendChild(datalist);
+  function portOptions(selected) {
+    const current = C.normalizePort(selected);
+    return `<option value="" ${current ? "" : "selected"}>Seleccionar</option>${uniquePorts()
+      .map((port) => `<option value="${escapeHtml(port.code)}" ${port.code === current ? "selected" : ""}>${escapeHtml(port.code)} · ${escapeHtml(port.label)}</option>`)
+      .join("")}`;
   }
 
   async function importFile(file) {
@@ -115,7 +93,7 @@
       return;
     }
 
-    elements.dropzone.classList.add("is-loading");
+    elements.dropzone.classList.add("is-busy");
     try {
       const buffer = await file.arrayBuffer();
       const parsed = C.parseWorkbook(buffer, window.XLSX);
@@ -130,36 +108,32 @@
 
       elements.crewSearch.value = "";
       elements.showIssues.textContent = "Mostrar incidencias";
-      elements.hero.classList.add("is-hidden");
       elements.workspace.classList.remove("is-hidden");
       renderAll();
       window.scrollTo({ top: 0, behavior: "smooth" });
-      showToast(`${parsed.records.length} tripulantes importados correctamente.`);
+      const expiredDocuments = parsed.records.filter((record) => C.documentExpiry(record) === "caducada").length;
+      const expiredNotice = expiredDocuments
+        ? ` ${expiredDocuments} ${expiredDocuments === 1 ? "documento con la caducidad cumplida" : "documentos con la caducidad cumplida"}.`
+        : "";
+      showToast(`${parsed.records.length} tripulantes importados correctamente.${expiredNotice}`);
     } catch (error) {
       console.error(error);
       showToast(error && error.message ? error.message : "No se ha podido leer el archivo.", "error");
     } finally {
-      elements.dropzone.classList.remove("is-loading");
+      elements.dropzone.classList.remove("is-busy");
       elements.fileInput.value = "";
     }
   }
 
   function renderSummary() {
-    const validations = crewValidation();
-    const invalid = validations.filter((result) => !result.valid).length;
-    elements.sourceName.textContent = state.sourceFile ? state.sourceFile.name : "—";
-    elements.sourceMeta.textContent = state.sourceFile
-      ? `${formatBytes(state.sourceFile.size)} · Hoja: ${state.sheetName}`
-      : "—";
-    elements.crewCount.textContent = String(state.records.length);
-    elements.validCount.textContent = String(state.records.length - invalid);
-    elements.warningCount.textContent = String(invalid);
+    elements.dropLabel.textContent = state.sourceFile ? state.sourceFile.name : "Introducir archivo crewlist";
   }
 
   function issueText(validation) {
     const parts = [];
     if (validation.missing.length) parts.push(`Faltan: ${validation.missing.join(", ")}`);
     if (validation.warnings.length) parts.push(validation.warnings.join(" · "));
+    if (validation.notices && validation.notices.length) parts.push(validation.notices.join(" · "));
     return parts.join(" · ");
   }
 
@@ -198,23 +172,10 @@
     elements.tableResultCount.textContent = `${visible.length} ${visible.length === 1 ? "registro" : "registros"}`;
   }
 
-  function directionName(direction) {
-    return direction === "E" ? "Entrada" : "Salida";
-  }
-
-  function routeName(movement) {
-    const origin = C.shortPort(movement.embarkPort) || "ORIGEN";
-    const destination = C.shortPort(movement.disembarkPort) || "DESTINO";
-    return `${directionName(movement.direction)} · ${origin} → ${destination}`;
-  }
-
-  function movementTemplate(movement, index) {
+  function movementTemplate(movement) {
     const errors = C.movementErrors(movement);
     const invalid = (field) => {
       const checks = {
-        reference: !String(movement.reference || "").trim(),
-        scheduleDate: !movement.scheduleDate,
-        scheduleTime: !movement.scheduleTime,
         embarkPort: !C.normalizePort(movement.embarkPort),
         disembarkPort: !C.normalizePort(movement.disembarkPort),
         embarkDate: !movement.embarkDate,
@@ -224,69 +185,34 @@
       };
       return checks[field] ? 'aria-invalid="true"' : "";
     };
-    const errorCopy = errors.length ? `${errors.length} ${errors.length === 1 ? "dato pendiente" : "datos pendientes"}: ${errors.join(", ")}` : "Listo para exportar";
 
     return `
-      <article class="movement-card ${errors.length ? "has-errors" : ""}" data-movement-id="${movement.id}">
-        <div class="movement-head">
-          <div class="movement-ident">
-            <span class="movement-index">${String(index + 1).padStart(2, "0")}</span>
-            <div><strong>Movimiento ${index + 1}</strong><span data-route-title>${escapeHtml(routeName(movement))}</span></div>
+      <article data-movement-id="${movement.id}">
+        <fieldset class="schedule-fieldset">
+          <legend>Datos</legend>
+          <div class="field-grid schedule-grid">
+            <div class="field"><label>Sentido</label><select data-field="direction"><option value="S" ${movement.direction === "S" ? "selected" : ""}>S · Salida</option><option value="E" ${movement.direction === "E" ? "selected" : ""}>E · Entrada</option></select></div>
+            <div class="field"><label>Puerto de embarque</label><select data-field="embarkPort" ${invalid("embarkPort")}>${portOptions(movement.embarkPort)}</select></div>
+            <div class="field"><label>Puerto de desembarque</label><select data-field="disembarkPort" ${invalid("disembarkPort")}>${portOptions(movement.disembarkPort)}</select></div>
+            <div class="field"><label>Fecha embarque</label><input type="date" data-field="embarkDate" value="${escapeHtml(movement.embarkDate)}" ${invalid("embarkDate")} /></div>
+            <div class="field"><label>Hora embarque</label><input type="time" data-field="embarkTime" value="${escapeHtml(movement.embarkTime)}" ${invalid("embarkTime")} /></div>
+            <div class="field"><label>Fecha desembarque</label><input type="date" data-field="disembarkDate" value="${escapeHtml(movement.disembarkDate)}" ${invalid("disembarkDate")} /></div>
+            <div class="field"><label>Hora desembarque</label><input type="time" data-field="disembarkTime" value="${escapeHtml(movement.disembarkTime)}" ${invalid("disembarkTime")} /></div>
           </div>
-          <div class="movement-tools">
-            <button class="tool-button" type="button" data-action="duplicate" title="Duplicar movimiento"><svg aria-hidden="true" viewBox="0 0 24 24"><path d="M8 8V3h13v13h-5v5H3V8h5Zm2 0h6v6h3V5h-9v3Zm-5 2v9h9v-9H5Z" /></svg></button>
-            <button class="tool-button" type="button" data-action="download" title="Descargar este CSV"><svg aria-hidden="true" viewBox="0 0 24 24"><path d="M13 4h-2v8.2L8.4 9.6 7 11l5 5 5-5-1.4-1.4-2.6 2.6V4ZM5 18v2h14v-2H5Z" /></svg></button>
-            <button class="tool-button danger" type="button" data-action="remove" title="Eliminar movimiento"><svg aria-hidden="true" viewBox="0 0 24 24"><path d="M8 3h8l1 2h4v2H3V5h4l1-2Zm-2 6h12l-1 12H7L6 9Zm3 2v7h2v-7H9Zm4 0v7h2v-7h-2Z" /></svg></button>
-          </div>
-        </div>
-        <div class="movement-body">
-          <div class="form-grid">
-            <label class="field"><span>Sentido <b>*</b></span><select data-field="direction"><option value="S" ${movement.direction === "S" ? "selected" : ""}>S · Salida</option><option value="E" ${movement.direction === "E" ? "selected" : ""}>E · Entrada</option></select></label>
-            <label class="field"><span>Número de escala <b>*</b></span><input data-field="reference" value="${escapeHtml(movement.reference)}" placeholder="Ej. 29941" inputmode="numeric" ${invalid("reference")} /><small class="field-help">Se incluirá en el nombre del archivo.</small></label>
-            <label class="field"><span>Fecha oficial del viaje <b>*</b></span><input type="date" data-field="scheduleDate" value="${escapeHtml(movement.scheduleDate)}" ${invalid("scheduleDate")} /><small class="field-help">Fecha usada en el nombre.</small></label>
-            <label class="field"><span>Hora oficial del viaje <b>*</b></span><input type="time" data-field="scheduleTime" value="${escapeHtml(movement.scheduleTime)}" ${invalid("scheduleTime")} /><small class="field-help">Hora usada en el nombre.</small></label>
-
-            <div class="route-fields">
-              <label class="field"><span>Puerto de embarque <b>*</b></span><input data-field="embarkPort" value="${escapeHtml(movement.embarkPort)}" list="port-codes" maxlength="5" placeholder="ESALG" ${invalid("embarkPort")} /></label>
-              <button class="swap-button" type="button" data-action="swap" title="Intercambiar puertos"><svg aria-hidden="true" viewBox="0 0 24 24"><path d="m7 7 3-3H4v6l3-3Zm10 10-3 3h6v-6l-3 3ZM5.4 15.7l1.4-1.4A7.1 7.1 0 0 0 13 18v2a9.1 9.1 0 0 1-7.6-4.3ZM11 4a9.1 9.1 0 0 1 7.6 4.3l-1.4 1.4A7.1 7.1 0 0 0 11 6V4Z" /></svg></button>
-              <label class="field"><span>Puerto de desembarque <b>*</b></span><input data-field="disembarkPort" value="${escapeHtml(movement.disembarkPort)}" list="port-codes" maxlength="5" placeholder="ESCEU" ${invalid("disembarkPort")} /></label>
-            </div>
-            <label class="field span-2"><span>Naviera <small>(opcional)</small></span><input data-field="shippingCompany" value="${escapeHtml(movement.shippingCompany)}" placeholder="Se conserva la del Excel si queda vacío" /></label>
-            <label class="field"><span>Fecha embarque <b>*</b></span><input type="date" data-field="embarkDate" value="${escapeHtml(movement.embarkDate)}" ${invalid("embarkDate")} /></label>
-            <label class="field"><span>Hora embarque <b>*</b></span><input type="time" data-field="embarkTime" value="${escapeHtml(movement.embarkTime)}" ${invalid("embarkTime")} /></label>
-            <label class="field"><span>Fecha desembarque <b>*</b></span><input type="date" data-field="disembarkDate" value="${escapeHtml(movement.disembarkDate)}" ${invalid("disembarkDate")} /></label>
-            <label class="field"><span>Hora desembarque <b>*</b></span><input type="time" data-field="disembarkTime" value="${escapeHtml(movement.disembarkTime)}" ${invalid("disembarkTime")} /></label>
-          </div>
-          <div class="movement-foot">
-            <div class="filename-preview">
-              <svg aria-hidden="true" viewBox="0 0 24 24"><path d="M6 2h8l4 4v16H6V2Zm8 1.8V7h3.2L14 3.8ZM8 11v1.7h8V11H8Zm0 4v1.7h8V15H8Z" /></svg>
-              <div><small>NOMBRE DE SALIDA</small><code data-filename>${escapeHtml(C.buildFilename(movement))}</code></div>
-            </div>
-            <span class="movement-error" data-movement-error>${escapeHtml(errorCopy)}</span>
-          </div>
-        </div>
+        </fieldset>
       </article>`;
   }
 
   function renderMovements() {
-    ensurePortList();
     elements.movementList.innerHTML = state.movements.map(movementTemplate).join("");
   }
 
   function refreshMovementCard(movement) {
     const card = elements.movementList.querySelector(`[data-movement-id="${movement.id}"]`);
     if (!card) return;
-    const errors = C.movementErrors(movement);
-    const errorCopy = errors.length ? `${errors.length} ${errors.length === 1 ? "dato pendiente" : "datos pendientes"}: ${errors.join(", ")}` : "Listo para exportar";
-    card.classList.toggle("has-errors", errors.length > 0);
-    card.querySelector("[data-route-title]").textContent = routeName(movement);
-    card.querySelector("[data-filename]").textContent = C.buildFilename(movement);
-    card.querySelector("[data-movement-error]").textContent = errorCopy;
+    card.classList.toggle("has-errors", C.movementErrors(movement).length > 0);
 
     const fieldChecks = {
-      reference: !String(movement.reference || "").trim(),
-      scheduleDate: !movement.scheduleDate,
-      scheduleTime: !movement.scheduleTime,
       embarkPort: !C.normalizePort(movement.embarkPort),
       disembarkPort: !C.normalizePort(movement.disembarkPort),
       embarkDate: !movement.embarkDate,
@@ -300,11 +226,6 @@
     });
   }
 
-  function setProgressState(element, stateName) {
-    element.classList.remove("is-active", "is-complete");
-    if (stateName) element.classList.add(`is-${stateName}`);
-  }
-
   function updateExportState() {
     const crewIssues = invalidCrewCount();
     const validMovements = state.movements.filter((movement) => C.movementErrors(movement).length === 0).length;
@@ -314,22 +235,6 @@
     elements.exportAll.disabled = !ready;
     const exportLabel = elements.exportAll.querySelector("span");
     exportLabel.textContent = state.movements.length > 1 ? `Descargar ${state.movements.length} archivos` : "Descargar CSV";
-
-    if (crewIssues > 0) {
-      elements.exportTitle.textContent = `Revisa ${crewIssues} ${crewIssues === 1 ? "tripulante" : "tripulantes"}`;
-      elements.exportDescription.textContent = "Corrige los registros marcados antes de generar los archivos.";
-    } else if (!allMovementsValid) {
-      const pending = state.movements.length - validMovements;
-      elements.exportTitle.textContent = `Completa ${pending} ${pending === 1 ? "movimiento" : "movimientos"}`;
-      elements.exportDescription.textContent = "Faltan datos de escala, ruta o fecha en las tarjetas señaladas.";
-    } else {
-      elements.exportTitle.textContent = state.movements.length > 1 ? `${state.movements.length} CSV listos para descargar` : "CSV listo para descargar";
-      elements.exportDescription.textContent = `${state.records.length} tripulantes · 29 columnas · Separador “;” · Formato CRLF`;
-    }
-
-    setProgressState(elements.progressCrew, crewIssues === 0 ? "complete" : "active");
-    setProgressState(elements.progressMovements, crewIssues > 0 ? null : allMovementsValid ? "complete" : "active");
-    setProgressState(elements.progressExport, ready ? "active" : null);
   }
 
   function renderAll() {
@@ -376,27 +281,6 @@
     showToast("Registro actualizado.");
   }
 
-  function addMovement(source) {
-    const base = source || state.movements[state.movements.length - 1] || {
-      direction: "S",
-      reference: "",
-      scheduleDate: "",
-      scheduleTime: "",
-      embarkPort: "ESALG",
-      disembarkPort: "",
-      embarkDate: "",
-      embarkTime: "",
-      disembarkDate: "",
-      disembarkTime: "",
-      shippingCompany: "",
-    };
-    state.movements.push({ ...base, id: state.nextMovementId++, reference: "" });
-    renderMovements();
-    updateExportState();
-    const last = elements.movementList.lastElementChild;
-    if (last) last.scrollIntoView({ behavior: "smooth", block: "center" });
-  }
-
   function downloadBlob(blob, filename) {
     const url = URL.createObjectURL(blob);
     const anchor = document.createElement("a");
@@ -413,26 +297,6 @@
       name: C.buildFilename(movement),
       content: C.buildCsv(state.records, movement),
     };
-  }
-
-  function canDownloadMovement(movement) {
-    if (invalidCrewCount() > 0) {
-      showToast("Corrige primero los registros de tripulación marcados.", "error");
-      return false;
-    }
-    const errors = C.movementErrors(movement);
-    if (errors.length) {
-      showToast(`Completa este movimiento: ${errors.join(", ")}.`, "error");
-      return false;
-    }
-    return true;
-  }
-
-  function downloadMovement(movement) {
-    if (!canDownloadMovement(movement)) return;
-    const file = csvFile(movement);
-    downloadBlob(new Blob([file.content], { type: "text/csv;charset=utf-8" }), file.name);
-    showToast("CSV generado con el formato de Autoridad Portuaria.");
   }
 
   function crc32(bytes) {
@@ -554,20 +418,18 @@
     showToast(files.length === 1 ? "CSV generado correctamente." : `${files.length} CSV incluidos en el paquete ZIP.`);
   }
 
-  elements.dropzone.addEventListener("click", () => elements.fileInput.click());
-  elements.changeFile.addEventListener("click", () => elements.fileInput.click());
   elements.fileInput.addEventListener("change", (event) => importFile(event.target.files[0]));
 
   ["dragenter", "dragover"].forEach((eventName) => {
     elements.dropzone.addEventListener(eventName, (event) => {
       event.preventDefault();
-      elements.dropzone.classList.add("is-dragging");
+      elements.dropzone.classList.add("is-drag");
     });
   });
   ["dragleave", "drop"].forEach((eventName) => {
     elements.dropzone.addEventListener(eventName, (event) => {
       event.preventDefault();
-      elements.dropzone.classList.remove("is-dragging");
+      elements.dropzone.classList.remove("is-drag");
     });
   });
   elements.dropzone.addEventListener("drop", (event) => importFile(event.dataTransfer.files[0]));
@@ -595,7 +457,6 @@
     saveCrewRecord();
   });
 
-  elements.addMovement.addEventListener("click", () => addMovement());
   elements.movementList.addEventListener("input", (event) => {
     const input = event.target.closest("[data-field]");
     const card = event.target.closest("[data-movement-id]");
@@ -603,47 +464,11 @@
     const movement = movementById(card.dataset.movementId);
     if (!movement) return;
     let value = input.value;
-    if (["embarkPort", "disembarkPort"].includes(input.dataset.field)) value = value.toUpperCase().replace(/\s/g, "");
     movement[input.dataset.field] = value;
     refreshMovementCard(movement);
     updateExportState();
   });
-  elements.movementList.addEventListener("change", (event) => {
-    const input = event.target.closest("[data-field]");
-    if (input && ["embarkPort", "disembarkPort"].includes(input.dataset.field)) {
-      input.value = C.normalizePort(input.value);
-      input.dispatchEvent(new Event("input", { bubbles: true }));
-    }
-  });
-  elements.movementList.addEventListener("click", (event) => {
-    const button = event.target.closest("[data-action]");
-    const card = event.target.closest("[data-movement-id]");
-    if (!button || !card) return;
-    const movement = movementById(card.dataset.movementId);
-    if (!movement) return;
-
-    if (button.dataset.action === "swap") {
-      [movement.embarkPort, movement.disembarkPort] = [movement.disembarkPort, movement.embarkPort];
-      movement.direction = movement.disembarkPort === "ESALG" ? "E" : movement.embarkPort === "ESALG" ? "S" : movement.direction;
-      renderMovements();
-      updateExportState();
-    } else if (button.dataset.action === "duplicate") {
-      addMovement(movement);
-    } else if (button.dataset.action === "remove") {
-      if (state.movements.length === 1) {
-        showToast("Debe existir al menos un movimiento.", "error");
-        return;
-      }
-      state.movements = state.movements.filter((item) => item.id !== movement.id);
-      renderMovements();
-      updateExportState();
-    } else if (button.dataset.action === "download") {
-      downloadMovement(movement);
-    }
-  });
-
   elements.exportAll.addEventListener("click", downloadAll);
-  elements.helpButton.addEventListener("click", () => elements.helpDialog.showModal());
 
   window.addEventListener("dragover", (event) => event.preventDefault());
   window.addEventListener("drop", (event) => {

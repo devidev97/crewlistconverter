@@ -71,10 +71,6 @@
     ESCEU: { code: "ESCEU", label: "Ceuta" },
     PTM: { code: "MAPTM", label: "Tánger Med" },
     MAPTM: { code: "MAPTM", label: "Tánger Med" },
-    TNG: { code: "MATNG", label: "Tánger" },
-    MATNG: { code: "MATNG", label: "Tánger" },
-    TAR: { code: "ESTAR", label: "Tarifa" },
-    ESTAR: { code: "ESTAR", label: "Tarifa" },
   };
 
   const HEADER_ALIASES = {
@@ -165,7 +161,7 @@
 
   function normalizePort(value) {
     const source = text(value).toUpperCase().replace(/\s/g, "");
-    return PORTS[source] ? PORTS[source].code : source;
+    return PORTS[source] ? PORTS[source].code : "";
   }
 
   function shortPort(value) {
@@ -280,29 +276,46 @@
     };
   }
 
-  function validateRecord(record) {
+  function calendarDate(value) {
+    const match = text(value).match(/^(\d{2})\/(\d{2})\/(\d{4})$/);
+    if (!match) return null;
+    const date = new Date(Number(match[3]), Number(match[2]) - 1, Number(match[1]));
+    if (date.getFullYear() !== Number(match[3]) || date.getMonth() !== Number(match[2]) - 1 || date.getDate() !== Number(match[1])) return null;
+    return date;
+  }
+
+  function documentExpiry(record, today = new Date()) {
+    const expiry = calendarDate(record && record.FechaCaducidadDocumento);
+    if (!expiry) return "";
+    const current = new Date(today.getFullYear(), today.getMonth(), today.getDate());
+    return expiry >= current ? "vigente" : "caducada";
+  }
+
+  function validateRecord(record, today = new Date()) {
     const missing = REQUIRED_CREW_FIELDS.filter((field) => !text(record[field]));
     const warnings = [];
+    const notices = [];
     if (record.Sexo && !["M", "F"].includes(record.Sexo)) warnings.push("Sexo debe ser M o F");
     if (record.Nacionalidad && !/^[A-Z]{2}$/.test(record.Nacionalidad)) warnings.push("Nacionalidad debe tener 2 letras");
     ["FechaCaducidadDocumento", "FechaNacimiento"].forEach((field) => {
       if (record[field] && !/^\d{2}\/\d{2}\/\d{4}$/.test(record[field])) warnings.push(`${field} no tiene formato DD/MM/AAAA`);
     });
-    return { valid: missing.length === 0 && warnings.length === 0, missing, warnings };
+    const expiry = documentExpiry(record, today);
+    if (expiry === "caducada") warnings.push("Documentación caducada");
+    return { valid: missing.length === 0 && warnings.length === 0, missing, warnings, notices, expiry };
   }
 
   function movementErrors(movement) {
     const errors = [];
-    if (!text(movement.reference)) errors.push("Número de escala");
-    if (!movement.scheduleDate) errors.push("Fecha oficial del viaje");
-    if (!movement.scheduleTime) errors.push("Hora oficial del viaje");
-    if (!normalizePort(movement.embarkPort)) errors.push("Puerto de embarque");
-    if (!normalizePort(movement.disembarkPort)) errors.push("Puerto de desembarque");
+    const embarkPort = normalizePort(movement.embarkPort);
+    const disembarkPort = normalizePort(movement.disembarkPort);
+    if (!embarkPort) errors.push("Puerto de embarque");
+    if (!disembarkPort) errors.push("Puerto de desembarque");
     if (!movement.embarkDate) errors.push("Fecha de embarque");
     if (!movement.embarkTime) errors.push("Hora de embarque");
     if (!movement.disembarkDate) errors.push("Fecha de desembarque");
     if (!movement.disembarkTime) errors.push("Hora de desembarque");
-    if (movement.embarkPort && movement.disembarkPort && normalizePort(movement.embarkPort) === normalizePort(movement.disembarkPort)) {
+    if (embarkPort && disembarkPort && embarkPort === disembarkPort) {
       errors.push("Los puertos deben ser distintos");
     }
     return errors;
@@ -320,7 +333,6 @@
     output.PtoDesembarque = normalizePort(movement.disembarkPort);
     output.FechaEmbarque = formatMovementDate(movement.embarkDate, movement.embarkTime);
     output.FechaDesembarque = formatMovementDate(movement.disembarkDate, movement.disembarkTime);
-    if (text(movement.shippingCompany)) output.Naviera = text(movement.shippingCompany);
     return output;
   }
 
@@ -337,23 +349,8 @@
     return `${rows.join("\r\n")}\r\n`;
   }
 
-  function sanitizeFilenamePart(value) {
-    return text(value)
-      .normalize("NFD")
-      .replace(/[\u0300-\u036f]/g, "")
-      .replace(/[^a-zA-Z0-9_-]/g, "")
-      .toUpperCase();
-  }
-
-  function buildFilename(movement) {
-    const date = String(movement.scheduleDate || movement.embarkDate || "").match(/^(\d{4})-(\d{2})-(\d{2})$/);
-    const year = date ? date[1] : "AAAA";
-    const compactDate = date ? `${date[3]}${date[2]}` : "DDMM";
-    const compactTime = String(movement.scheduleTime || movement.embarkTime || "HH:MM").replace(":", "");
-    const reference = sanitizeFilenamePart(movement.reference) || "ESCALA";
-    const origin = sanitizeFilenamePart(shortPort(movement.embarkPort)) || "ORIGEN";
-    const destination = sanitizeFilenamePart(shortPort(movement.disembarkPort)) || "DESTINO";
-    return `${year}-${reference}-${compactDate}-${compactTime}-${origin}-${destination}-Crew.csv`;
+  function buildFilename() {
+    return "Lista de tripulantes.csv";
   }
 
   function inferMovement(filename, records) {
@@ -393,7 +390,6 @@
       embarkTime: timeFromValue(first.FechaEmbarque),
       disembarkDate: toIsoDate(first.FechaDesembarque) || date,
       disembarkTime: timeFromValue(first.FechaDesembarque),
-      shippingCompany: first.Naviera || "",
     };
   }
 
@@ -408,6 +404,7 @@
     normalizePort,
     shortPort,
     validateRecord,
+    documentExpiry,
     movementErrors,
     applyMovement,
     buildCsv,

@@ -19,7 +19,7 @@ Después:
 
 1. Carga el Excel recibido.
 2. Revisa los tripulantes marcados con incidencias.
-3. Completa el número de escala, la ruta y las horas.
+3. Completa la ruta y las horas.
 4. Añade o duplica movimientos si necesitas varias salidas.
 5. Descarga un CSV o, si hay varios movimientos, el paquete ZIP.
 
@@ -38,9 +38,7 @@ npm run preview
 - Fechas de movimiento: `DD/MM/AAAA HH:MM`.
 - Final de línea: Windows CRLF.
 - Codificación: UTF-8 sin BOM.
-- Nombre: `AAAA-ESCALA-DDMM-HHMM-ORIGEN-DESTINO-Crew.csv`.
-
-La fecha y hora oficiales usadas en el nombre del archivo se introducen por separado de las fechas de embarque y desembarque. Así se pueden reproducir casos como los CSV de referencia, donde ambos horarios no coinciden.
+- Nombre: `Lista de tripulantes.csv`.
 
 La descripción de categoría se normaliza según su código (`ZOT` → `Otros`, `ZCP` → `Capitan`, etc.). Las columnas no presentes en el Excel, como `SchengenArea`, se incluyen vacías.
 
