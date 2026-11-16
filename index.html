@@ -17,22 +17,23 @@
 
       <main>
         <div class="workspace">
-        <section class="panel pdf-panel" aria-label="Importar lista">
+        <section class="panel pdf-panel" aria-label="Origen de la lista">
           <div class="pdf-import">
             <label class="pdf-drop" id="dropzone">
               <svg class="pdf-drop__icon" width="40" height="48" viewBox="0 0 40 48" fill="none" aria-hidden="true"><path d="M8 4h16l8 8v32a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2z" stroke="currentColor" stroke-width="1.5"/><path d="M24 4v8h8" stroke="currentColor" stroke-width="1.5"/><path d="M12 22h16M12 28h16M12 34h10" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>
-              <span class="pdf-drop__text" id="dropzone-label">Introducir archivo crewlist</span>
+              <span class="pdf-drop__text" id="dropzone-label">Introducir archivo Excel o CSV</span>
               <input class="pdf-drop__input" id="file-input" type="file" accept=".xls,.xlsx,.csv" aria-label="Seleccionar archivo crewlist" />
             </label>
           </div>
         </section>
 
-        <section class="panel form-panel is-hidden" id="workspace" aria-live="polite">
+        <section class="panel form-panel" id="workspace" aria-live="polite">
           <div id="movement-list" class="movement-list"></div>
 
           <section class="panel crew-panel">
             <div class="panel-header">
               <div class="table-actions">
+                <button class="primary small" id="add-crew" type="button">Añadir tripulante</button>
                 <label class="search-box">
                   <svg aria-hidden="true" viewBox="0 0 24 24"><path d="m19.6 21-6.3-6.3a7.5 7.5 0 1 1 1.4-1.4l6.3 6.3-1.4 1.4ZM8.5 14A5.5 5.5 0 1 0 8.5 3a5.5 5.5 0 0 0 0 11Z" /></svg>
                   <input id="crew-search" type="search" placeholder="Buscar tripulante..." />
@@ -46,7 +47,7 @@
                 <thead><tr><th>Tripulante</th><th>Documento</th><th>Nacionalidad</th><th>Nacimiento</th><th>Categoría</th><th>Sexo</th><th>Estado</th><th><span class="sr-only">Acciones</span></th></tr></thead>
                 <tbody id="crew-body"></tbody>
               </table>
-              <div class="empty-table is-hidden" id="empty-table">No hay tripulantes que coincidan con la búsqueda.</div>
+              <div class="empty-table is-hidden" id="empty-table">Todavía no hay tripulantes.</div>
             </div>
             <div class="table-footer"><span id="table-result-count">0 registros</span></div>
           </section>
@@ -83,7 +84,7 @@
             <label class="field"><span>Nacionalidad <b>*</b></span><input name="Nacionalidad" maxlength="2" required /></label>
             <label class="field"><span>Fecha de nacimiento <b>*</b></span><input name="FechaNacimiento" placeholder="DD/MM/AAAA" required /></label>
             <label class="field"><span>Lugar de nacimiento <b>*</b></span><input name="LugarNacimiento" required /></label>
-            <label class="field"><span>Código categoría <b>*</b></span><input name="Categoria" maxlength="5" required /></label>
+            <label class="field"><span>Código categoría <b>*</b></span><select name="Categoria" required><option value="">Seleccionar</option></select></label>
             <label class="field span-2"><span>Descripción de categoría</span><input name="CategoriaDes" /></label>
             <label class="field"><span>Sexo <b>*</b></span><select name="Sexo" required><option value="">Seleccionar</option><option value="M">M · Masculino</option><option value="F">F · Femenino</option></select></label>
             <label class="field span-4"><span>Observaciones</span><input name="Observaciones" /></label>
@@ -100,7 +101,7 @@
       <form method="dialog">
         <div class="modal-header"><div><small>GUÍA RÁPIDA</small><h3>Cómo preparar los archivos</h3></div><button class="icon-button" value="close" aria-label="Cerrar"><svg aria-hidden="true" viewBox="0 0 24 24"><path d="m6.4 5 5.6 5.6L17.6 5 19 6.4 13.4 12l5.6 5.6-1.4 1.4-5.6-5.6L6.4 19 5 17.6l5.6-5.6L5 6.4 6.4 5Z" /></svg></button></div>
         <div class="modal-body help-content">
-          <ol><li><strong>Carga el Excel recibido.</strong><span>Se admiten .xls, .xlsx y también un CSV previo.</span></li><li><strong>Revisa las incidencias.</strong><span>La tabla indica si falta algún dato obligatorio.</span></li><li><strong>Completa los datos.</strong><span>Indica puertos y fechas del movimiento.</span></li><li><strong>Descarga el resultado.</strong><span>Se genera un CSV con la tripulación.</span></li></ol>
+          <ol><li><strong>Carga el Excel o crea la lista a mano.</strong><span>Se admiten .xls, .xlsx y .csv. También puedes añadir cada tripulante.</span></li><li><strong>Revisa las incidencias.</strong><span>La tabla indica si falta algún dato obligatorio.</span></li><li><strong>Completa los datos.</strong><span>Indica puertos y fechas del movimiento.</span></li><li><strong>Descarga el resultado.</strong><span>Se genera un CSV con la tripulación.</span></li></ol>
           <p class="help-note">Los CSV se generan con separador de punto y coma, 29 columnas y finales de línea Windows (CRLF), igual que los archivos de referencia.</p>
         </div>
         <div class="modal-footer"><button class="primary" value="close">Entendido</button></div>

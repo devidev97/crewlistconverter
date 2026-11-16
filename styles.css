@@ -112,7 +112,6 @@ main {
 .panel { min-width: 0; padding: 0; background: transparent; border: 0; }
 .pdf-panel { padding: 0 0 12px; }
 .form-panel { padding-block: 0 24px; }
-
 .pdf-drop {
   position: relative;
   display: flex;
@@ -176,7 +175,9 @@ legend {
 }
 
 .field-grid { display: grid; gap: 16px; }
-.schedule-grid { grid-template-columns: repeat(4, 1fr); }
+.schedule-grid { grid-template-columns: repeat(3, 1fr); }
+.schedule-dates { grid-column: 1 / -1; display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+.datetime-pair { display: grid; grid-template-columns: minmax(0, 1.4fr) minmax(0, 1fr); gap: 8px; }
 .field label,
 .field > span {
   color: var(--navy);
@@ -282,7 +283,10 @@ button:focus-visible { outline: none; border-color: var(--ink); }
 .status-badge::before { content: ""; width: 7px; height: 7px; background: var(--success); border-radius: 50%; }
 .status-badge.issue { color: var(--warning); }
 .status-badge.issue::before { background: var(--warning); }
+.row-actions { display: flex; gap: 6px; white-space: nowrap; }
 .edit-button { min-height: 32px; padding: 4px 10px; font-size: 13px; line-height: 18px; }
+.edit-button--danger { color: var(--danger); border-color: var(--danger); }
+.edit-button--danger:hover { background: var(--danger-soft); }
 .empty-table { padding: 24px; color: var(--muted); text-align: center; }
 .table-footer { min-height: 40px; padding: 8px 10px; display: flex; align-items: center; color: var(--muted); background: var(--surface-soft); border: 1px solid var(--divider); border-top: 0; font-size: 12px; }
 
@@ -351,6 +355,7 @@ button:focus-visible { outline: none; border-color: var(--ink); }
 
 @media (width <= 760px) {
   .schedule-grid { grid-template-columns: 1fr 1fr; }
+  .schedule-dates { grid-template-columns: 1fr; }
   .form-grid { grid-template-columns: 1fr 1fr; }
   .span-4 { grid-column: span 2; }
 }
@@ -360,7 +365,7 @@ button:focus-visible { outline: none; border-color: var(--ink); }
   main { width: min(100% - 24px, 960px); margin-block: 12px 36px; padding: 18px; }
   .panel-header, .table-actions { align-items: stretch; flex-direction: column; }
   .search-box { width: 100%; }
-  .schedule-grid, .form-grid { grid-template-columns: 1fr; }
+  .schedule-grid, .schedule-dates, .form-grid { grid-template-columns: 1fr; }
   .span-2, .span-4 { grid-column: span 1; }
   .downloads { max-width: none; }
   input, select, textarea { font-size: 16px; }

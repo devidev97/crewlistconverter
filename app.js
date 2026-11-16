@@ -12,12 +12,20 @@
     nextMovementId: 1,
   };
 
+  const CREW_FIELDS = [
+    "Nombre", "Apellidos", "TipoDocumento", "NumeroDocumento", "NumeroVisado",
+    "FechaCaducidadDocumento", "Nacionalidad", "FechaNacimiento", "LugarNacimiento",
+    "Categoria", "CategoriaDes", "Sexo", "Observaciones",
+  ];
+
   const elements = {
     hero: document.querySelector("#hero"),
     workspace: document.querySelector("#workspace"),
     fileInput: document.querySelector("#file-input"),
     dropzone: document.querySelector("#dropzone"),
     dropLabel: document.querySelector("#dropzone-label"),
+    addCrew: document.querySelector("#add-crew"),
+    saveCrew: document.querySelector("#save-crew"),
     crewBody: document.querySelector("#crew-body"),
     crewSearch: document.querySelector("#crew-search"),
     showIssues: document.querySelector("#show-issues"),
@@ -108,7 +116,6 @@
 
       elements.crewSearch.value = "";
       elements.showIssues.textContent = "Mostrar incidencias";
-      elements.workspace.classList.remove("is-hidden");
       renderAll();
       window.scrollTo({ top: 0, behavior: "smooth" });
       const expiredDocuments = parsed.records.filter((record) => C.documentExpiry(record) === "caducada").length;
@@ -126,7 +133,23 @@
   }
 
   function renderSummary() {
-    elements.dropLabel.textContent = state.sourceFile ? state.sourceFile.name : "Introducir archivo crewlist";
+    elements.dropLabel.textContent = state.sourceFile ? state.sourceFile.name : "Introducir archivo Excel o CSV";
+  }
+
+  function blankMovement() {
+    return {
+      id: state.nextMovementId++,
+      direction: "S",
+      reference: "",
+      scheduleDate: "",
+      scheduleTime: "",
+      embarkPort: "",
+      disembarkPort: "",
+      embarkDate: "",
+      embarkTime: "",
+      disembarkDate: "",
+      disembarkTime: "",
+    };
   }
 
   function issueText(validation) {
@@ -163,11 +186,14 @@
             <td class="category-cell"><strong>${escapeHtml(record.Categoria || "—")}</strong><span>${escapeHtml(record.CategoriaDes || "Sin descripción")}</span></td>
             <td>${escapeHtml(record.Sexo || "—")}</td>
             <td><span class="status-badge ${validation.valid ? "" : "issue"}" title="${escapeHtml(issue)}">${validation.valid ? "Correcto" : "Revisar"}</span></td>
-            <td><button class="edit-button" type="button" data-edit-record="${index}">Editar</button></td>
+            <td class="row-actions"><button class="edit-button" type="button" data-edit-record="${index}">Editar</button><button class="edit-button edit-button--danger" type="button" data-delete-record="${index}">Eliminar</button></td>
           </tr>`;
       })
       .join("");
 
+    elements.emptyTable.textContent = state.records.length === 0
+      ? "Todavía no hay tripulantes. Añade el primero para poder generar el CSV."
+      : "No hay tripulantes que coincidan con la búsqueda.";
     elements.emptyTable.classList.toggle("is-hidden", visible.length !== 0);
     elements.tableResultCount.textContent = `${visible.length} ${visible.length === 1 ? "registro" : "registros"}`;
   }
@@ -194,10 +220,22 @@
             <div class="field"><label>Sentido</label><select data-field="direction"><option value="S" ${movement.direction === "S" ? "selected" : ""}>S · Salida</option><option value="E" ${movement.direction === "E" ? "selected" : ""}>E · Entrada</option></select></div>
             <div class="field"><label>Puerto de embarque</label><select data-field="embarkPort" ${invalid("embarkPort")}>${portOptions(movement.embarkPort)}</select></div>
             <div class="field"><label>Puerto de desembarque</label><select data-field="disembarkPort" ${invalid("disembarkPort")}>${portOptions(movement.disembarkPort)}</select></div>
-            <div class="field"><label>Fecha embarque</label><input type="date" data-field="embarkDate" value="${escapeHtml(movement.embarkDate)}" ${invalid("embarkDate")} /></div>
-            <div class="field"><label>Hora embarque</label><input type="time" data-field="embarkTime" value="${escapeHtml(movement.embarkTime)}" ${invalid("embarkTime")} /></div>
-            <div class="field"><label>Fecha desembarque</label><input type="date" data-field="disembarkDate" value="${escapeHtml(movement.disembarkDate)}" ${invalid("disembarkDate")} /></div>
-            <div class="field"><label>Hora desembarque</label><input type="time" data-field="disembarkTime" value="${escapeHtml(movement.disembarkTime)}" ${invalid("disembarkTime")} /></div>
+            <div class="schedule-dates">
+              <div class="field">
+                <label>Fecha de embarque</label>
+                <div class="datetime-pair">
+                  <input type="date" data-field="embarkDate" value="${escapeHtml(movement.embarkDate)}" aria-label="Fecha de embarque" ${invalid("embarkDate")} />
+                  <input type="time" data-field="embarkTime" value="${escapeHtml(movement.embarkTime)}" aria-label="Hora de embarque" ${invalid("embarkTime")} />
+                </div>
+              </div>
+              <div class="field">
+                <label>Fecha de desembarque</label>
+                <div class="datetime-pair">
+                  <input type="date" data-field="disembarkDate" value="${escapeHtml(movement.disembarkDate)}" aria-label="Fecha de desembarque" ${invalid("disembarkDate")} />
+                  <input type="time" data-field="disembarkTime" value="${escapeHtml(movement.disembarkTime)}" aria-label="Hora de desembarque" ${invalid("disembarkTime")} />
+                </div>
+              </div>
+            </div>
           </div>
         </fieldset>
       </article>`;
@@ -230,7 +268,7 @@
     const crewIssues = invalidCrewCount();
     const validMovements = state.movements.filter((movement) => C.movementErrors(movement).length === 0).length;
     const allMovementsValid = validMovements === state.movements.length && state.movements.length > 0;
-    const ready = crewIssues === 0 && allMovementsValid;
+    const ready = state.records.length > 0 && crewIssues === 0 && allMovementsValid;
 
     elements.exportAll.disabled = !ready;
     const exportLabel = elements.exportAll.querySelector("span");
@@ -244,41 +282,68 @@
     updateExportState();
   }
 
+  function fillCategoryOptions(selected) {
+    const select = elements.crewForm.elements.Categoria;
+    const codes = Object.keys(C.CATEGORY_DESCRIPTIONS);
+    const current = String(selected || "").toUpperCase();
+    const options = codes.map((code) => ({ code, label: C.CATEGORY_DESCRIPTIONS[code] }));
+    if (current && !codes.includes(current)) options.push({ code: current, label: "Categoría del archivo" });
+    select.innerHTML = `<option value="">Seleccionar</option>${options
+      .map((option) => `<option value="${escapeHtml(option.code)}">${escapeHtml(option.code)} · ${escapeHtml(option.label)}</option>`)
+      .join("")}`;
+    select.value = current;
+  }
+
   function openCrewEditor(index) {
-    const record = state.records[index];
-    if (!record) return;
+    const isNew = index == null || Number.isNaN(Number(index));
+    const record = isNew ? null : state.records[index];
+    if (!isNew && !record) return;
     elements.crewForm.reset();
-    elements.crewForm.elements.recordIndex.value = String(index);
-    [
-      "Nombre", "Apellidos", "TipoDocumento", "NumeroDocumento", "NumeroVisado",
-      "FechaCaducidadDocumento", "Nacionalidad", "FechaNacimiento", "LugarNacimiento",
-      "Categoria", "CategoriaDes", "Sexo", "Observaciones",
-    ].forEach((field) => {
-      elements.crewForm.elements[field].value = record[field] || "";
-    });
-    elements.modalTitle.textContent = `${record.Nombre} ${record.Apellidos}`.trim() || "Datos del tripulante";
+    elements.crewForm.elements.recordIndex.value = isNew ? "" : String(index);
+    fillCategoryOptions(record ? record.Categoria : "");
+    if (record) {
+      CREW_FIELDS.forEach((field) => {
+        if (field === "Categoria") return;
+        elements.crewForm.elements[field].value = record[field] || "";
+      });
+    }
+    elements.modalTitle.textContent = isNew
+      ? "Nuevo tripulante"
+      : (`${record.Nombre} ${record.Apellidos}`.trim() || "Datos del tripulante");
+    elements.saveCrew.textContent = isNew ? "Añadir tripulante" : "Guardar cambios";
     elements.crewDialog.showModal();
+    elements.crewForm.elements.Nombre.focus();
   }
 
   function saveCrewRecord() {
     if (!elements.crewForm.reportValidity()) return;
-    const index = Number(elements.crewForm.elements.recordIndex.value);
-    const previous = state.records[index];
-    if (!previous) return;
-    const updated = { ...previous };
-    [
-      "Nombre", "Apellidos", "TipoDocumento", "NumeroDocumento", "NumeroVisado",
-      "FechaCaducidadDocumento", "Nacionalidad", "FechaNacimiento", "LugarNacimiento",
-      "Categoria", "CategoriaDes", "Sexo", "Observaciones",
-    ].forEach((field) => {
+    const indexValue = elements.crewForm.elements.recordIndex.value;
+    const isNew = indexValue === "";
+    const index = Number(indexValue);
+    if (!isNew && !state.records[index]) return;
+    const updated = isNew ? {} : { ...state.records[index] };
+    CREW_FIELDS.forEach((field) => {
       updated[field] = elements.crewForm.elements[field].value;
     });
-    state.records[index] = C.normalizeRecord(updated);
+    const normalized = C.normalizeRecord(updated);
+    if (isNew) state.records.push(normalized);
+    else state.records[index] = normalized;
     elements.crewDialog.close();
     renderSummary();
     renderCrew();
     updateExportState();
-    showToast("Registro actualizado.");
+    showToast(isNew ? "Tripulante añadido." : "Registro actualizado.");
+  }
+
+  function deleteCrewRecord(index) {
+    const record = state.records[index];
+    if (!record) return;
+    const name = `${record.Nombre} ${record.Apellidos}`.trim() || "este tripulante";
+    if (!window.confirm(`¿Eliminar a ${name}?`)) return;
+    state.records.splice(index, 1);
+    renderCrew();
+    updateExportState();
+    showToast("Tripulante eliminado.");
   }
 
   function downloadBlob(blob, filename) {
@@ -403,7 +468,7 @@
   }
 
   function downloadAll() {
-    if (invalidCrewCount() > 0 || state.movements.some((movement) => C.movementErrors(movement).length)) {
+    if (!state.records.length || invalidCrewCount() > 0 || state.movements.some((movement) => C.movementErrors(movement).length)) {
       showToast("Aún hay datos pendientes de revisión.", "error");
       return;
     }
@@ -419,6 +484,11 @@
   }
 
   elements.fileInput.addEventListener("change", (event) => importFile(event.target.files[0]));
+  elements.addCrew.addEventListener("click", () => openCrewEditor());
+  elements.crewForm.elements.Categoria.addEventListener("change", () => {
+    const description = C.CATEGORY_DESCRIPTIONS[elements.crewForm.elements.Categoria.value];
+    if (description) elements.crewForm.elements.CategoriaDes.value = description;
+  });
 
   ["dragenter", "dragover"].forEach((eventName) => {
     elements.dropzone.addEventListener(eventName, (event) => {
@@ -444,8 +514,10 @@
     renderCrew();
   });
   elements.crewBody.addEventListener("click", (event) => {
-    const button = event.target.closest("[data-edit-record]");
-    if (button) openCrewEditor(Number(button.dataset.editRecord));
+    const editButton = event.target.closest("[data-edit-record]");
+    if (editButton) openCrewEditor(Number(editButton.dataset.editRecord));
+    const deleteButton = event.target.closest("[data-delete-record]");
+    if (deleteButton) deleteCrewRecord(Number(deleteButton.dataset.deleteRecord));
   });
 
   elements.crewForm.addEventListener("submit", (event) => {
@@ -474,4 +546,7 @@
   window.addEventListener("drop", (event) => {
     if (!event.target.closest || !event.target.closest("#dropzone")) event.preventDefault();
   });
+
+  state.movements = [blankMovement()];
+  renderAll();
 })();
