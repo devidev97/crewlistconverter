@@ -44,7 +44,7 @@
 
             <div class="register__table-wrap">
               <table class="register__table">
-                <thead><tr><th>Tripulante</th><th>Documento</th><th>Nacionalidad</th><th>Nacimiento</th><th>Categoría</th><th>Sexo</th><th>Estado</th><th><span class="sr-only">Acciones</span></th></tr></thead>
+                <thead><tr><th>Tripulante</th><th>Documento</th><th>Nacionalidad</th><th>Nacimiento</th><th>Categoría</th><th>Sexo</th><th>EntSal</th><th>Estado</th><th><span class="sr-only">Acciones</span></th></tr></thead>
                 <tbody id="crew-body"></tbody>
               </table>
               <div class="empty-table is-hidden" id="empty-table">Todavía no hay tripulantes.</div>
@@ -75,6 +75,7 @@
         <div class="modal-body">
           <input type="hidden" name="recordIndex" />
           <div class="form-grid modal-grid">
+            <label class="field"><span>EntSal <b>*</b></span><select name="EntSal" required><option value="S">S · Salida</option><option value="E">E · Entrada</option></select></label>
             <label class="field span-2"><span>Nombre <b>*</b></span><input name="Nombre" required /></label>
             <label class="field span-2"><span>Apellidos <b>*</b></span><input name="Apellidos" required /></label>
             <label class="field"><span>Tipo documento <b>*</b></span><input name="TipoDocumento" required maxlength="5" /></label>

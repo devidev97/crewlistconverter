@@ -37,7 +37,10 @@
     "SchengenArea",
   ];
 
+  const OFFICIAL_HEADERS = HEADERS.filter((header) => header !== "SchengenArea");
+
   const REQUIRED_CREW_FIELDS = [
+    "EntSal",
     "Nombre",
     "Apellidos",
     "TipoDocumento",
@@ -135,20 +138,57 @@
     return Number.isNaN(date.getTime()) ? "" : `${pad(date.getUTCDate())}/${pad(date.getUTCMonth() + 1)}/${date.getUTCFullYear()}`;
   }
 
-  function normalizeDate(value) {
+  function formatCalendarDate(day, month, year) {
+    if (month < 1 || month > 12 || day < 1 || day > 31) return "";
+    const date = new Date(Date.UTC(year, month - 1, day));
+    if (date.getUTCFullYear() !== year || date.getUTCMonth() !== month - 1 || date.getUTCDate() !== day) return "";
+    return `${pad(day)}/${pad(month)}/${year}`;
+  }
+
+  function expandYear(year, mode, today = new Date()) {
+    const value = Number(year);
+    if (value >= 100) return value;
+    if (mode === "birth") {
+      const recent = 2000 + value;
+      return recent > today.getFullYear() ? 1900 + value : recent;
+    }
+    return 2000 + value;
+  }
+
+  function normalizeDate(value, mode) {
     if (value instanceof Date && !Number.isNaN(value.getTime())) {
-      return `${pad(value.getDate())}/${pad(value.getMonth() + 1)}/${value.getFullYear()}`;
+      return `${pad(value.getUTCDate())}/${pad(value.getUTCMonth() + 1)}/${value.getUTCFullYear()}`;
     }
 
     const source = text(value);
     if (!source) return "";
-    if (/^\d{5}(?:\.\d+)?$/.test(source)) return excelSerialToDate(source);
+    if (/^\d{1,6}(?:\.\d+)?$/.test(source)) {
+      const serial = Number(source);
+      if (serial >= 1000 && serial < 80000) return excelSerialToDate(serial);
+    }
 
-    let match = source.match(/^(\d{1,2})[\/.\-](\d{1,2})[\/.\-](\d{4})(?:\s+.*)?$/);
-    if (match) return `${pad(match[1])}/${pad(match[2])}/${match[3]}`;
+    let match = source.match(/^(\d{1,2})[\/.\-](\d{1,2})[\/.\-](\d{2}|\d{4})(?:\s+.*)?$/);
+    if (match) {
+      const first = Number(match[1]);
+      const second = Number(match[2]);
+      const year = expandYear(match[3], mode);
+      const shortYear = match[3].length === 2;
+      let day = first;
+      let month = second;
+      if (second > 12 && first <= 12) {
+        day = second;
+        month = first;
+      } else if (shortYear && first <= 12 && second <= 12) {
+        // Excel shows some real dates as m/d/yy. A full year stays day/month.
+        day = second;
+        month = first;
+      }
+      const formatted = formatCalendarDate(day, month, year);
+      if (formatted) return formatted;
+    }
 
     match = source.match(/^(\d{4})-(\d{1,2})-(\d{1,2})(?:[T\s].*)?$/);
-    if (match) return `${pad(match[3])}/${pad(match[2])}/${match[1]}`;
+    if (match) return formatCalendarDate(Number(match[3]), Number(match[2]), Number(match[1]));
 
     return source;
   }
@@ -169,6 +209,13 @@
     return code.length === 5 ? code.slice(2) : code;
   }
 
+  function normalizeEntSal(value) {
+    const source = text(value).toUpperCase();
+    if (/^(E|ENTRADA|ENTRY|ARRIVAL)$/.test(source)) return "E";
+    if (/^(S|SALIDA|EXIT|DEPARTURE)$/.test(source)) return "S";
+    return "";
+  }
+
   function normalizeRecord(input) {
     const record = {};
     HEADERS.forEach((header) => {
@@ -176,11 +223,12 @@
     });
 
     record.Tipo = record.Tipo || "T";
-    record.FechaCaducidadDocumento = normalizeDate(record.FechaCaducidadDocumento);
-    record.FechaNacimiento = normalizeDate(record.FechaNacimiento);
+    record.FechaCaducidadDocumento = normalizeDate(record.FechaCaducidadDocumento, "expiry");
+    record.FechaNacimiento = normalizeDate(record.FechaNacimiento, "birth");
     record.Nacionalidad = record.Nacionalidad.toUpperCase();
     record.Categoria = record.Categoria.toUpperCase();
     record.Sexo = record.Sexo.toUpperCase();
+    record.EntSal = normalizeEntSal(record.EntSal);
 
     if (CATEGORY_DESCRIPTIONS[record.Categoria]) {
       record.CategoriaDes = CATEGORY_DESCRIPTIONS[record.Categoria];
@@ -193,18 +241,24 @@
     return record;
   }
 
-  function findHeaderRow(rows) {
-    let best = { index: -1, score: 0 };
-    rows.slice(0, 25).forEach((row, index) => {
-      const found = new Set();
-      (row || []).forEach((cell) => {
-        const canonical = HEADER_ALIASES[normalizeKey(cell)];
-        if (canonical) found.add(canonical);
-      });
-      if (found.size > best.score) best = { index, score: found.size };
+  function headerNames(row) {
+    const found = new Set();
+    (row || []).forEach((cell) => {
+      const canonical = HEADER_ALIASES[normalizeKey(cell)];
+      if (canonical) found.add(canonical);
     });
-    if (best.score < 4) throw new Error("No se reconoce la fila de cabeceras del archivo.");
-    return best.index;
+    return found;
+  }
+
+  function isOfficialHeader(row) {
+    const found = headerNames(row);
+    return OFFICIAL_HEADERS.every((header) => found.has(header));
+  }
+
+  function findHeaderRow(rows) {
+    const index = rows.slice(0, 25).findIndex((row) => isOfficialHeader(row));
+    if (index < 0) throw new Error("El archivo no es una lista oficial de tripulación.");
+    return index;
   }
 
   function parseWorkbook(arrayBuffer, XLSX) {
@@ -229,7 +283,9 @@
       const rows = XLSX.utils.sheet_to_json(workbook.Sheets[sheetName], {
         header: 1,
         defval: "",
-        raw: false,
+        // Keep Excel date serials numeric so they become DD/MM/AAAA
+        // instead of the workbook's m/d/yy display text.
+        raw: true,
         blankrows: false,
       });
       try {
@@ -246,7 +302,7 @@
       }
     });
 
-    if (!selectedRows) throw new Error("No se encuentra una tabla de tripulación compatible.");
+    if (!selectedRows) throw new Error("El archivo no es una lista oficial de tripulación.");
 
     const columnMap = {};
     selectedRows[selectedHeader].forEach((cell, columnIndex) => {
@@ -328,7 +384,6 @@
 
   function applyMovement(record, movement) {
     const output = normalizeRecord(record);
-    output.EntSal = movement.direction === "E" ? "E" : "S";
     output.PtoEmbarque = normalizePort(movement.embarkPort);
     output.PtoDesembarque = normalizePort(movement.disembarkPort);
     output.FechaEmbarque = formatMovementDate(movement.embarkDate, movement.embarkTime);
@@ -380,7 +435,6 @@
       return match ? `${pad(match[1])}:${match[2]}` : "";
     };
     return {
-      direction: ["E", "S"].includes(first.EntSal) ? first.EntSal : inferredDestination === "ESALG" ? "E" : "S",
       reference: acceptedName ? acceptedName[2] : "",
       scheduleDate,
       scheduleTime,

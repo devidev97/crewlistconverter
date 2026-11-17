@@ -175,7 +175,7 @@ legend {
 }
 
 .field-grid { display: grid; gap: 16px; }
-.schedule-grid { grid-template-columns: repeat(3, 1fr); }
+.schedule-grid { grid-template-columns: repeat(2, 1fr); }
 .schedule-dates { grid-column: 1 / -1; display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
 .datetime-pair { display: grid; grid-template-columns: minmax(0, 1.4fr) minmax(0, 1fr); gap: 8px; }
 .field label,
@@ -283,7 +283,8 @@ button:focus-visible { outline: none; border-color: var(--ink); }
 .status-badge::before { content: ""; width: 7px; height: 7px; background: var(--success); border-radius: 50%; }
 .status-badge.issue { color: var(--warning); }
 .status-badge.issue::before { background: var(--warning); }
-.row-actions { display: flex; gap: 6px; white-space: nowrap; }
+.row-actions { display: flex; align-items: center; gap: 6px; white-space: nowrap; }
+.entsal-select { height: 32px; min-width: 124px; padding: 4px 28px 4px 8px; font-size: 13px; }
 .edit-button { min-height: 32px; padding: 4px 10px; font-size: 13px; line-height: 18px; }
 .edit-button--danger { color: var(--danger); border-color: var(--danger); }
 .edit-button--danger:hover { background: var(--danger-soft); }
