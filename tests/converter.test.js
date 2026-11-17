@@ -65,6 +65,8 @@ assert.strictEqual(parsed.sheetName, "2000 Alg- Ceu");
 assert.strictEqual(parsed.records.length, 2);
 assert.strictEqual(parsed.records[0].CategoriaDes, "Otros");
 assert.strictEqual(parsed.records[1].CategoriaDes, "Capitan");
+assert.strictEqual(C.normalizeRecord({ Nombre: "Esther", Apellidos: "Toledo garcía" }).Nombre, "ESTHER");
+assert.strictEqual(C.normalizeRecord({ Nombre: "Esther", Apellidos: "Toledo garcía" }).Apellidos, "TOLEDO GARCÍA");
 assert.strictEqual(parsed.records[0].EntSal, "S");
 assert.strictEqual(parsed.records[1].EntSal, "E");
 assert.strictEqual(C.validateRecord(parsed.records[0]).valid, true);

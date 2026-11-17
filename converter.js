@@ -223,6 +223,8 @@
     });
 
     record.Tipo = record.Tipo || "T";
+    record.Nombre = record.Nombre.toLocaleUpperCase("es");
+    record.Apellidos = record.Apellidos.toLocaleUpperCase("es");
     record.FechaCaducidadDocumento = normalizeDate(record.FechaCaducidadDocumento, "expiry");
     record.FechaNacimiento = normalizeDate(record.FechaNacimiento, "birth");
     record.Nacionalidad = record.Nacionalidad.toUpperCase();
