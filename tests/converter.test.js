@@ -77,6 +77,7 @@ assert.strictEqual(inferred.disembarkPort, "ESCEU");
 assert.strictEqual(inferred.scheduleTime, "20:00");
 assert.strictEqual(inferred.embarkTime, "");
 assert.strictEqual(inferred.embarkDate, "2026-11-12");
+assert.strictEqual(inferred.direction, "S");
 
 const movement = {
   direction: "S",
@@ -105,6 +106,12 @@ const mixed = parsed.records.map((record, index) => ({ ...record, EntSal: index 
 const mixedLines = C.buildCsv(mixed, movement).split("\r\n").filter(Boolean);
 assert.strictEqual(mixedLines[1].split(";")[1], "S");
 assert.strictEqual(mixedLines[2].split(";")[1], "E");
+const missingEntSal = parsed.records.map((record, index) => ({ ...record, EntSal: index === 0 ? "" : record.EntSal }));
+const defaulted = C.buildCsv(missingEntSal, { ...movement, direction: "E" }).split("\r\n").filter(Boolean);
+assert.strictEqual(defaulted[1].split(";")[1], "E");
+assert.strictEqual(defaulted[2].split(";")[1], "E");
+assert.strictEqual(C.buildCsv(missingEntSal, { ...movement, direction: "S" }).split("\r\n")[1].split(";")[1], "S");
+assert.strictEqual(C.inferMovement("llegada.xls", [{ PtoDesembarque: "ESALG" }]).direction, "E");
 assert.strictEqual(lines[1].split(";")[C.HEADERS.indexOf("Naviera")], "DFDS");
 assert.strictEqual(lines[2].split(";")[C.HEADERS.indexOf("Naviera")], "BALEARIA");
 assert.strictEqual(C.buildFilename(movement), "Lista de tripulantes.csv");

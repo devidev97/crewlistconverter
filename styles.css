@@ -175,7 +175,7 @@ legend {
 }
 
 .field-grid { display: grid; gap: 16px; }
-.schedule-grid { grid-template-columns: repeat(2, 1fr); }
+.schedule-grid { grid-template-columns: repeat(3, minmax(0, 1fr)); }
 .schedule-dates { grid-column: 1 / -1; display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
 .datetime-pair { display: grid; grid-template-columns: minmax(0, 1.4fr) minmax(0, 1fr); gap: 8px; }
 .field label,
@@ -284,7 +284,7 @@ button:focus-visible { outline: none; border-color: var(--ink); }
 .status-badge.issue { color: var(--warning); }
 .status-badge.issue::before { background: var(--warning); }
 .row-actions { display: flex; align-items: center; gap: 6px; white-space: nowrap; }
-.entsal-select { height: 32px; min-width: 124px; padding: 4px 28px 4px 8px; font-size: 13px; }
+.entsal-default { display: block; color: var(--muted); font-size: 11px; line-height: 15px; }
 .edit-button { min-height: 32px; padding: 4px 10px; font-size: 13px; line-height: 18px; }
 .edit-button--danger { color: var(--danger); border-color: var(--danger); }
 .edit-button--danger:hover { background: var(--danger-soft); }
@@ -355,7 +355,7 @@ button:focus-visible { outline: none; border-color: var(--ink); }
 .sr-only { position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px; overflow: hidden; clip: rect(0, 0, 0, 0); white-space: nowrap; border: 0; }
 
 @media (width <= 760px) {
-  .schedule-grid { grid-template-columns: 1fr 1fr; }
+  .schedule-grid { grid-template-columns: repeat(3, minmax(0, 1fr)); }
   .schedule-dates { grid-template-columns: 1fr; }
   .form-grid { grid-template-columns: 1fr 1fr; }
   .span-4 { grid-column: span 2; }

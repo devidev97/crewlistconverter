@@ -58,8 +58,17 @@
     toastTimer = setTimeout(() => elements.toast.classList.remove("is-visible"), 3600);
   }
 
+  function defaultDirection() {
+    const movement = state.movements[0];
+    return movement && movement.direction === "E" ? "E" : "S";
+  }
+
+  function effectiveEntSal(record) {
+    return shownEntSal(record) || defaultDirection();
+  }
+
   function crewValidation() {
-    return state.records.map((record) => C.validateRecord(record));
+    return state.records.map((record) => C.validateRecord({ ...record, EntSal: effectiveEntSal(record) }));
   }
 
   function invalidCrewCount() {
@@ -139,6 +148,7 @@
   function blankMovement() {
     return {
       id: state.nextMovementId++,
+      direction: "S",
       reference: "",
       scheduleDate: "",
       scheduleTime: "",
@@ -184,7 +194,7 @@
             <td>${escapeHtml(record.FechaNacimiento || "—")}</td>
             <td class="category-cell"><strong>${escapeHtml(record.Categoria || "—")}</strong><span>${escapeHtml(record.CategoriaDes || "Sin descripción")}</span></td>
             <td>${escapeHtml(record.Sexo || "—")}</td>
-            <td><select class="entsal-select" data-entsal="${index}" aria-label="EntSal"><option value="" ${shownEntSal(record) ? "" : "selected"}>Seleccionar</option><option value="S" ${shownEntSal(record) === "S" ? "selected" : ""}>S · Salida</option><option value="E" ${shownEntSal(record) === "E" ? "selected" : ""}>E · Entrada</option></select></td>
+            <td>${escapeHtml(effectiveEntSal(record))}${shownEntSal(record) ? "" : `<span class="entsal-default">Predeterminado</span>`}</td>
             <td><span class="status-badge ${validation.valid ? "" : "issue"}" title="${escapeHtml(issue)}">${validation.valid ? "Correcto" : "Revisar"}</span></td>
             <td><div class="row-actions"><button class="edit-button" type="button" data-edit-record="${index}">Editar</button><button class="edit-button edit-button--danger" type="button" data-delete-record="${index}">Eliminar</button></div></td>
           </tr>`;
@@ -217,6 +227,7 @@
         <fieldset class="schedule-fieldset">
           <legend>Datos</legend>
           <div class="field-grid schedule-grid">
+            <div class="field"><label>Sentido</label><select data-field="direction" aria-label="EntSal predeterminado"><option value="S" ${movement.direction === "E" ? "" : "selected"}>S · Salida</option><option value="E" ${movement.direction === "E" ? "selected" : ""}>E · Entrada</option></select></div>
             <div class="field"><label>Puerto de embarque</label><select data-field="embarkPort" ${invalid("embarkPort")}>${portOptions(movement.embarkPort)}</select></div>
             <div class="field"><label>Puerto de desembarque</label><select data-field="disembarkPort" ${invalid("disembarkPort")}>${portOptions(movement.disembarkPort)}</select></div>
             <div class="schedule-dates">
@@ -310,7 +321,7 @@
         elements.crewForm.elements[field].value = record[field] || "";
       });
     }
-    if (isNew) elements.crewForm.elements.EntSal.value = "S";
+    if (isNew) elements.crewForm.elements.EntSal.value = defaultDirection();
     elements.modalTitle.textContent = isNew
       ? "Nuevo tripulante"
       : (`${record.Nombre} ${record.Apellidos}`.trim() || "Datos del tripulante");
@@ -517,15 +528,6 @@
     elements.showIssues.textContent = state.issuesOnly ? "Mostrar todos" : "Mostrar incidencias";
     renderCrew();
   });
-  elements.crewBody.addEventListener("change", (event) => {
-    const select = event.target.closest("[data-entsal]");
-    if (!select) return;
-    const index = Number(select.dataset.entsal);
-    if (!state.records[index]) return;
-    state.records[index].EntSal = select.value === "E" || select.value === "S" ? select.value : "";
-    renderCrew();
-    updateExportState();
-  });
   elements.crewBody.addEventListener("click", (event) => {
     const editButton = event.target.closest("[data-edit-record]");
     if (editButton) openCrewEditor(Number(editButton.dataset.editRecord));
@@ -551,6 +553,7 @@
     let value = input.value;
     movement[input.dataset.field] = value;
     refreshMovementCard(movement);
+    if (input.dataset.field === "direction") renderCrew();
     updateExportState();
   });
   elements.exportAll.addEventListener("click", downloadAll);

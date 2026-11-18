@@ -386,6 +386,9 @@
 
   function applyMovement(record, movement) {
     const output = normalizeRecord(record);
+    if (output.EntSal !== "E" && output.EntSal !== "S") {
+      output.EntSal = movement.direction === "E" ? "E" : "S";
+    }
     output.PtoEmbarque = normalizePort(movement.embarkPort);
     output.PtoDesembarque = normalizePort(movement.disembarkPort);
     output.FechaEmbarque = formatMovementDate(movement.embarkDate, movement.embarkTime);
@@ -437,6 +440,7 @@
       return match ? `${pad(match[1])}:${match[2]}` : "";
     };
     return {
+      direction: ["E", "S"].includes(first.EntSal) ? first.EntSal : inferredDestination === "ESALG" ? "E" : "S",
       reference: acceptedName ? acceptedName[2] : "",
       scheduleDate,
       scheduleTime,
